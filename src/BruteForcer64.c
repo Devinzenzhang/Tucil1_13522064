@@ -9,11 +9,19 @@ struct sequence {
     int reward;
 };
 
+struct moves {
+    int *coordinates;
+    int size;
+    int reward;
+};
+
 int buffer_size; // >= 0
 int matrix_width, matrix_height; // > 0
 char *matrix;
 int number_of_sequences; // >= 0
 struct sequence *sequence_list;
+
+int max_reward = 0;
 
 void print_matrix(){
     printf("Generating Matrix...\n");
@@ -47,7 +55,7 @@ int pilih_mode(){
                 printf("pilih yg mana?\n");
             } else {break;}
         } else {
-            while (getchar() != '\n'){}; // clear input stream
+            while (getchar() != '\n'){} // clear input stream
             printf("pilih yg mana?\n");
         }
     }
@@ -59,7 +67,7 @@ int baca_txt(){
     int pilihan = 1;
     char path[256] = "../txt/";
     while (1){
-        printf("Masukkan nama file (di folder txt, jangan ada spasi, max 200an karakter): ");
+        printf("Masukkan nama file (di folder txt, jangan ada spasi): ");
         scanf("%248s", &path[7]);
         txt_file = fopen(path, "r");
         if (txt_file == NULL){
@@ -109,7 +117,7 @@ void input_teks(){
         printf("Masukkan jumlah token unik: ");
         isInt = scanf("%d", &jumlah_token_unik);
         if (isInt && (jumlah_token_unik < 1)){printf("Harus bilangan positif!!!\n"); isInt = 0;}
-        while (getchar() != '\n'){};
+        while (getchar() != '\n'){}
     }
     char token_unik[jumlah_token_unik * 2 + 1];
     int isAlfanumerik; int isUnik;
@@ -139,21 +147,21 @@ void input_teks(){
         printf("Masukkan ukuran buffer: ");
         isInt = scanf("%d", &buffer_size);
         if (isInt && (buffer_size < 0)){printf("Darimana ceritanya ada ukuran buffer bilangan negatif!?!?!?\n"); isInt = 0;}
-        while (getchar() != '\n'){};
+        while (getchar() != '\n'){}
     }
     isInt = 0;
     while (isInt < 2){
         printf("Masukkan ukuran matriks: ");
         isInt = scanf("%d %d", &matrix_width, &matrix_height);
         if ((isInt == 2) && ((matrix_width < 1) || (matrix_height < 1))){printf("Harus lebih besar dari 0...\n"); isInt = 0;}
-        while (getchar() != '\n'){};
+        while (getchar() != '\n'){}
     }
     isInt = 0;
     while (!isInt){
         printf("Masukkan jumlah sekuens: ");
         isInt = scanf("%d", &number_of_sequences);
         if (isInt && (number_of_sequences < 0)){printf("Jumlah sekuens kok minus\n"); isInt = 0;}
-        while (getchar() != '\n'){};
+        while (getchar() != '\n'){}
     }
     isInt = 0;
     while (!isInt){
@@ -163,7 +171,6 @@ void input_teks(){
             if (max_seq_length < 2){printf("Tidak boleh dibawah 2!!!\n"); isInt = 0;}
             else if ((max_seq_length > buffer_size) && (buffer_size > 1)){printf("Tidak boleh lebih besar daripada ukuran buffer!!!\n"); isInt = 0;}
         }
-        while (getchar() != '\n'){};
     }
 
     // randomize.
@@ -193,26 +200,153 @@ void input_teks(){
     print_sequence_list();
 }
 
-void AbsoluteSolver64(){}
+int Check_Sekuens(struct moves check){
+    int reward = 0;
+    int isThere;
+    for (int i = 0; i < number_of_sequences; i++){
+        isThere = 0;
+        if (sequence_list[i].size <= check.size){
+            for (int j = 0; j <= (check.size - sequence_list[i].size); j++){
+                isThere = 1;
+                for (int k = 0; k < sequence_list[i].size; k++){
+                    if (
+                        (sequence_list[i].tokens[k * 2] !=
+                        matrix[((check.coordinates[(j + k) * 2] - 1) + (check.coordinates[(j + k) * 2 + 1] - 1) * matrix_width) * 2])
+                        ||
+                        (sequence_list[i].tokens[k * 2 + 1] !=
+                        matrix[((check.coordinates[(j + k) * 2] - 1) + (check.coordinates[(j + k) * 2 + 1] - 1) * matrix_width) * 2 + 1])
+                    ){
+                        isThere = 0; break;
+                    }
+                }
+                if (isThere){break;}
+            }
+        }
+        if(isThere){reward += sequence_list[i].reward;}
+    }
+    return reward;
+}
+
+void Copy_Moves(struct moves In, struct moves *Out){ // Out sudah dialokasi
+    Out->size = In.size; Out->reward = In.reward;
+    for (int i = 0; i < In.size; i++){
+        Out->coordinates[i * 2] = In.coordinates[i * 2];
+        Out->coordinates[i * 2 + 1] = In.coordinates[i * 2 + 1];
+    }
+}
+
+int check_duplicate(struct moves X){ // hanya yg terakhir
+    int isDupe = 0; int L = X.size - 1;
+    for(int i = 0; i < L; i++){
+        if ((X.coordinates[i * 2] == X.coordinates[L * 2]) && (X.coordinates[i * 2 + 1] == X.coordinates[L * 2 + 1])){isDupe = 1; break;}
+    }
+    return isDupe;
+}
+
+void We_Blowing_Up_Our_Computers_With_This_One(struct moves *X){
+    if(X->size != buffer_size){
+        struct moves Y; Y.coordinates = (int *) malloc (buffer_size * 2 * sizeof(int)); Copy_Moves(*X, &Y);
+        Y.coordinates[Y.size * 2] = Y.coordinates[(Y.size - 1) * 2];
+        Y.coordinates[Y.size * 2 + 1] = Y.coordinates[(Y.size - 1) * 2 + 1];
+        Y.size += 1;
+        struct moves temp; temp.coordinates = (int *) malloc (buffer_size * 2 * sizeof(int)); Copy_Moves(Y, &temp);
+        if (X->size % 2){ // vertikal
+            for (int i = 1; i <= matrix_height; i++){
+                Y.coordinates[(Y.size - 1) * 2 + 1] = i;
+                if (!check_duplicate(Y)){
+                    Y.reward = Check_Sekuens(Y);
+                    We_Blowing_Up_Our_Computers_With_This_One(&Y);
+                    if (Y.reward > X->reward){Copy_Moves(Y, X); if (X->reward == max_reward){break;}}
+                    Copy_Moves(temp, &Y);
+                }
+            }
+        } else { // horizontal
+            for (int i = 1; i <= matrix_width; i++){
+                Y.coordinates[(Y.size - 1) * 2] = i;
+                if (!check_duplicate(Y)){
+                    Y.reward = Check_Sekuens(Y);
+                    We_Blowing_Up_Our_Computers_With_This_One(&Y);
+                    if (Y.reward > X->reward){Copy_Moves(Y, X); if (X->reward == max_reward){break;}}
+                    Copy_Moves(temp, &Y);
+                }
+            }
+        }
+        free(Y.coordinates); free(temp.coordinates);
+    }
+}
+
+struct moves AbsoluteSolver64(){
+    struct moves result;
+    result.size = 0; result.reward = 0;
+    if (buffer_size < 2){return result;} // sekuens minimal dua tokens
+    for (int i = 0; i < number_of_sequences; i++){ // hitung max reward
+        if (sequence_list[i].reward > 0){max_reward += sequence_list[i].reward;}
+    }
+    if (max_reward <= 0){return result;}
+    result.coordinates = (int *) malloc (buffer_size * 2 * sizeof(int));
+    result.coordinates[0] = 1; result.coordinates[1] = 1; result.size = 1;
+    We_Blowing_Up_Our_Computers_With_This_One(&result);
+    return result;
+}
+
+void show_moves(struct moves P){
+    printf("%d\n", P.reward);
+    for (int i = 0; i < P.size; i++){
+        printf("%c", matrix[((P.coordinates[i * 2] - 1) + (P.coordinates[i * 2 + 1] - 1) * matrix_width) * 2]);
+        printf("%c", matrix[((P.coordinates[i * 2] - 1) + (P.coordinates[i * 2 + 1] - 1) * matrix_width) * 2 + 1]);
+        if (i < (P.size - 1)){printf(" ");} else {printf("\n");}
+    }
+    for (int i = 0; i < P.size; i++){
+        printf("%d, %d\n", P.coordinates[i * 2], P.coordinates[i * 2 + 1]);
+    }
+}
+
+void SAVE(struct moves result, long execution_time_ms){
+    char path[420] = "../test/";
+    printf("Nama file yang mau disimpan (jangan ada spasi): ");
+    while (getchar() != '\n'){}
+    scanf("%411s", &path[8]);
+    FILE *output;
+    output = fopen(path, "w");
+    if (path == NULL){
+        // is this even possible
+        printf("File gagal dibuat. Mempersiapkan rickroll...\n");
+        system("START https://www.youtube.com/watch?v=dQw4w9WgXcQ");
+    } else {
+        fprintf(output, "%d\n", result.reward);
+        for (int i = 0; i < result.size; i++){
+            fprintf(output, "%c", matrix[((result.coordinates[i * 2] - 1) + (result.coordinates[i * 2 + 1] - 1) * matrix_width) * 2]);
+            fprintf(output, "%c", matrix[((result.coordinates[i * 2] - 1) + (result.coordinates[i * 2 + 1] - 1) * matrix_width) * 2 + 1]);
+            if (i < (result.size - 1)){fprintf(output, " ");} else {fprintf(output, "\n");}
+        }
+        for (int i = 0; i < result.size; i++){
+            fprintf(output, "%d, %d\n", result.coordinates[i * 2], result.coordinates[i * 2 + 1]);
+        }
+        fprintf(output, "\n%ld ms\n", execution_time_ms);
+    }
+    fclose(output);
+}
 
 int main(){
     int pilihan;
+    char save;
     pilihan = pilih_mode();
-    if (pilihan == 1){
-        pilihan = baca_txt();
-    }
-    if (pilihan == 2){
-        input_teks();
-    }
+    if (pilihan == 1){pilihan = baca_txt();}
+    if (pilihan == 2){input_teks();}
 
     // it's bruteforcing time
     struct timeval start, end;
     gettimeofday(&start, 0);
-    AbsoluteSolver64();
+    struct moves result = AbsoluteSolver64();
     gettimeofday(&end, 0);
     long sec = end.tv_sec - start.tv_sec;
     long usec = end.tv_usec - start.tv_usec;
     long execution_time_ms = sec * 1000 + usec / 1000;
+    show_moves(result);
+    printf("\n%ld ms\n\nApakah ingin menyimpan solusi? (y/n) ", execution_time_ms);
+    while (getchar() != '\n'){}
+    scanf("%c", &save);
+    if ((save == 'Y') || (save == 'y')){SAVE(result, execution_time_ms);} else {printf("\nUnderstandable. Have a nice day.\n");}
 
     return 0;
 }
